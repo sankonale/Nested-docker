@@ -1,5 +1,5 @@
 FROM fedora:22
-MAINTAINER amitsaha.in@gmail.com
+MAINTAINER skonale89@gmail.com
 
 # Install docker
 RUN dnf -y update && dnf -y install docker && dnf clean all
