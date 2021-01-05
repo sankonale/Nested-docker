@@ -1,6 +1,5 @@
 FROM opensuse:latest
-MAINTAINER git@yeoldegrove.de
-
+MAINTAINER skonale89@gmail.com
 # Let's start with some basic stuff.
 RUN zypper --gpg-auto-import-keys --non-interactive refresh && \
     zypper --gpg-auto-import-keys --non-interactive update && \
