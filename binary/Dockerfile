@@ -1,5 +1,5 @@
 FROM alpine:3.2
-MAINTAINER t.dettrick@uq.edu.au
+MAINTAINER skonale89@gmail.com
 
 # Fake dmsetup, as device-mapper isn't compatible for static builds
 ADD ./dmsetup /usr/local/bin/dmsetup
