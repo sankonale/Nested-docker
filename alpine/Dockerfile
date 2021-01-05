@@ -1,5 +1,5 @@
 FROM alpine:3.3
-MAINTAINER javiertitan@gmail.com
+MAINTAINER skonale89@gmail.com
 
 # Install the magic wrapper.
 ADD ./wrapdocker /usr/local/bin/wrapdocker
