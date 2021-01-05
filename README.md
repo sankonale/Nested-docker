@@ -2,8 +2,6 @@
 
 This recipe lets you run Docker within Docker.
 
-![Inception's Spinning Top](spintop.jpg)
-
 There is only one requirement: your Docker version should support the
 `--privileged` flag.
 
@@ -12,9 +10,84 @@ There is only one requirement: your Docker version should support the
 
 If you came here because you would like to run a testing system like
 Jenkins in a container, and want that container to spin up more containers,
-then please read this [blog post](
-http://jpetazzo.github.io/2015/09/03/do-not-use-docker-in-docker-for-ci/)
-first. Thank you!
+
+
+Docker is Docker : bad
+One is about LSM (Linux Security Modules) like AppArmor and SELinux: when starting a container, the “inner Docker” might try to apply security profiles that will conflict or confuse the “outer Docker.” This was actually the hardest problem to solve when trying to merge the original implementation of the -privileged flag. My changes worked (and all tests would pass) on my Debian machine and Ubuntu test VMs, but it would crash and burn on Michael Crosby’s machine (which was Fedora if I remember well). I can’t remember the exact cause of the issue, but it might have been because Mike is a wise person who runs with SELINUX=enforce (I was using AppArmor) and my changes didn’t take SELinux profiles into account.
+
+The second issue is linked to storage drivers. When you run Docker in Docker, the outer Docker runs on top of a normal filesystem (EXT4, BTRFS, what have you) but the inner Docker runs on top of a copy-on-write system (AUFS, BTRFS, Device Mapper, etc., depending on what the outer Docker is setup to use). There are many combinations that won’t work. For instance, you cannot run AUFS on top of AUFS. If you run BTRFS on top of BTRFS, it should work at first, but once you have nested subvolumes, removing the parent subvolume will fail. Device Mapper is not namespaced, so if multiple instances of Docker use it on the same machine, they will all be able to see (and affect) each other’s image and container backing devices. 
+
+
+The Docker daemon was explicitly designed to have exclusive access to /var/lib/docker. Nothing else should touch, poke, or tickle any of the Docker files hidden there.
+
+Why is that? It’s one of the hard learned lessons from the dotCloud days. The dotCloud container engine worked by having multiple processes accessing /var/lib/dotcloud simultaneously. Clever tricks like atomic file replacement (instead of in-place editing), peppering the code with advisory and mandatory locking, and other experiments with safe-ish systems like SQLite and BDB only got us so far; and when we refactored our container engine (which eventually became Docker) one of the big design decisions was to gather all the container operations under a single daemon and be done with all that concurrent access nonsense.
+
+(Don’t get me wrong: it’s totally possible to do something nice and reliable and fast involving multiple processes and state-of-the-art concurrency management; but we think that it’s simpler, as well as easier to write and to maintain, to go with the single actor model of Docker.)
+
+This means that if you share your /var/lib/docker directory between multiple Docker instances, you’re gonna have a bad time. Of course, it might work, especially during early testing. “Look ma, I can docker run ubuntu!” But try to do something more involved (pull the same image from two different instances…) and watch the world burn.
+
+This means that if your CI system does builds and rebuilds, each time you’ll restart your Docker-in-Docker container, you might be nuking its cache. That’s really not cool.
+
+
+
+
+Docker-in-Docker: the good
+
+The goal was to help the core team to work faster on Docker development. Before Docker-in-Docker, the typical development cycle was:
+
+hackity hack
+build
+stop the currently running Docker daemon
+run the new Docker daemon
+test
+repeat
+And if you wanted to a nice, reproducible build (i.e. in a container), it was a bit more convoluted:
+
+hackity hack
+make sure that a workable version of Docker is running
+build new Docker with the old Docker
+stop Docker daemon
+run the new Docker daemon
+test
+stop the new Docker daemon
+repeat
+With the advent of Docker-in-Docker, this was simplified to:
+
+hackity hack
+build+run in one step
+repeat
+
+
+
+
+The socket solution
+Let’s take a step back here. Do you really want Docker-in-Docker? Or do you just want to be able to run Docker (specifically: build, run, sometimes push containers and images) from your CI system, while this CI system itself is in a container?
+
+I’m going to bet that most people want the latter. All you want is a solution so that your CI system like Jenkins can start containers.
+
+And the simplest way is to just expose the Docker socket to your CI container, by bind-mounting it with the -v flag.
+
+Simply put, when you start your CI container (Jenkins or other), instead of hacking something together with Docker-in-Docker, start it with:
+
+docker run -v /var/run/docker.sock:/var/run/docker.sock ...
+Now this container will have access to the Docker socket, and will therefore be able to start containers. Except that instead of starting “child” containers, it will start “sibling” containers.
+
+Try it out, using the docker official image (which contains the Docker binary):
+
+docker run -v /var/run/docker.sock:/var/run/docker.sock \
+           -ti docker
+This looks like Docker-in-Docker, feels like Docker-in-Docker, but it’s not Docker-in-Docker: when this container will create more containers, those containers will be created in the top-level Docker. You will not experience nesting side effects, and the build cache will be shared across multiple invocations.
+
+⚠️ Former versions of this post advised to bind-mount the docker binary from the host to the container. This is not reliable anymore, because the Docker Engine is no longer distributed as (almost) static libraries.
+
+If you want to use e.g. Docker from your Jenkins CI system, you have multiple options:
+
+installing the Docker CLI using your base image’s packaging system (i.e. if your image is based on Debian, use .deb packages),
+using the Docker API.
+
+
+
+
 
 
 ## Another word of warning
@@ -22,8 +95,7 @@ first. Thank you!
 This work is now obsolete, thanks to the [combined](
 https://github.com/docker/docker/pull/15596) [efforts](
 https://github.com/docker-library/official-images/blob/master/library/docker)
-of some amazing people like @jfrazelle and @tianon, who also 
-are black belts in the art of putting IKEA furniture together.
+
 
 If you want to run Docker-in-Docker today, all you need to do is:
 
@@ -165,7 +237,7 @@ file descriptors inherited from the parent Docker and `lxc-start`
 those inherited file descriptors, or if you're trying to repeat
 the experiment at home.
 
-[kojiromike/inception](https://github.com/kojiromike/inception) is
+
 a wrapper script that uses dind to nest Docker to arbitrary depth.
 
 Also, when you will be exiting a nested Docker, this will happen:
@@ -178,6 +250,3 @@ root@bc9f450caf22:/# exit
 jpetazzo@tarrasque:~/Work/DOTCLOUD/dind$
 ```
 
-At that point, you should blast Hans Zimmer's [Dream Is Collapsing](
-http://www.youtube.com/watch?v=imamcajBEJs) on your loudspeakers while twirling
-a spinning top.
