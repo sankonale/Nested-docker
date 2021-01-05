@@ -1,4 +1,4 @@
-# Docker-in-Docker
+# Docker-in-Docker : 
 
 This recipe lets you run Docker within Docker.
 
@@ -6,7 +6,7 @@ There is only one requirement: your Docker version should support the
 `--privileged` flag.
 
 
-## A word of warning
+## bad points and good points :
 
 If you came here because you would like to run a testing system like
 Jenkins in a container, and want that container to spin up more containers,
@@ -116,16 +116,6 @@ knowledge, check [its documentation on the Docker Hub](
 https://hub.docker.com/_/docker/).
 
 
-## If you read past this paragraph ...
-
-... Then you're probably an archaeologist, a masochist, or both.
-
-Seriously, though: the information below is here mostly
-for historical value, or if you want to understand how those
-things work under the hood.
-
-You've been warned!
-
 
 ## Quickstart
 
@@ -216,27 +206,11 @@ will be in the volume. Remember: volumes are not cleaned up when you
 10 Dockers within each other, look no further :-)
 
 
-## Which Version Of Docker Does It Run?
-
-Outside: it will use your installed version.
-
-Inside: the Dockerfile will retrieve the latest `docker` binary from
-https://get.docker.io/; so if you want to include *your* own `docker`
-build, you will have to edit it. If you want to always use your local
-version, you could change the `ADD` line to be e.g.:
-
-    ADD /usr/bin/docker /usr/local/bin/docker
-
 
 ## Can I Run Docker-in-Docker-in-Docker?
 
-Yes. Note, however, that there seems to be a weird FD leakage issue.
-To work around it, the `wrapdocker` script carefully closes all the
+yes, the `wrapdocker` script carefully closes all the
 file descriptors inherited from the parent Docker and `lxc-start`
-(except stdio). I'm mentioning this in case you were relying on
-those inherited file descriptors, or if you're trying to repeat
-the experiment at home.
-
 
 a wrapper script that uses dind to nest Docker to arbitrary depth.
 
