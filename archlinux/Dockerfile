@@ -1,5 +1,5 @@
 FROM finalduty/archlinux:daily
-MAINTAINER san@konale.com
+MAINTAINER skonale89@gmail.com
 
 # Install Docker from Arch repos
 RUN pacman -Syy --noprogressbar --noconfirm --needed ca-certificates lxc e2fsprogs docker
